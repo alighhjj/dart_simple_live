@@ -46,11 +46,17 @@ jobs:
           cd simple_live_app
           flutter pub get
       
-      # 构建APK
+      # 构建APK (如果签名配置不存在，则构建debug版本)
       - name: Build APK
         run: |
           cd simple_live_app
-          flutter build apk --release --split-per-abi
+          if [ -f android/key.properties ]; then
+            echo "Building release APK with signing"
+            flutter build apk --release --split-per-abi
+          else
+            echo "Building debug APK without signing"
+            flutter build apk --debug --split-per-abi
+          fi
       
       # 上传APK到Artifacts
       - name: Upload APK artifacts

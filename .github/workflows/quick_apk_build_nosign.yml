@@ -1,0 +1,56 @@
+name: Quick APK Build (No Signing)
+
+on:
+  workflow_dispatch: # 允许手动触发
+  push:
+    branches:
+      - 'dev'
+    paths:
+      - 'simple_live_app/**'
+      - '.github/workflows/quick_apk_build_nosign.yml'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 签出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # 设置Java环境
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+      
+      # 设置Flutter环境
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          cache: true
+      
+      # 更新Flutter packages
+      - name: Install dependencies
+        run: |
+          cd simple_live_app
+          flutter pub get
+      
+      # 构建APK (debug版本，不需要签名)
+      - name: Build APK (Debug)
+        run: |
+          cd simple_live_app
+          flutter build apk --debug --split-per-abi
+      
+      # 上传APK到Artifacts
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-live-app-debug-apks
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/app-armeabi-v7a-debug.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-debug.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-x86_64-debug.apk
