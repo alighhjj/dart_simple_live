@@ -25,3 +25,5 @@ simple_live_tv_app/build/
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 **/pubspec.lock
+
+.env
