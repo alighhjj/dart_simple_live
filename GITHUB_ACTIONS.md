@@ -1,66 +1,47 @@
 # GitHub Actions APK 构建说明
 
-本项目提供了多种不同的GitHub Actions工作流来构建APK：
+本项目提供以下GitHub Actions工作流来构建APK：
 
-1. `auto_build_apk.yml` - 自动构建APK并上传到Artifacts（如果配置了签名则构建发布版，否则构建调试版）
-2. `build_apk_nosign.yml` - 构建不带签名的调试版APK
-3. `build_apk_with_debug_keystore.yml` - 专门用于构建带调试签名的APK
-4. `quick_apk_build.yml` - 快速构建单一架构APK用于测试
-5. `signed_apk_build.yml` - 构建带签名的发布版APK并创建GitHub Release
+1. `build_apk_with_debug_keystore.yml` - 构建带调试签名的APK（用于测试和开发）
+2. `build_release_apk.yml` - 自动构建带正式签名的APK并发布到GitHub Release
+3. `generate_release_keystore.yml` - 生成正式签名密钥文件
 
-## 不需要签名的构建
+## 使用说明
 
-对于测试和开发，可以直接使用以下工作流之一：
-- `build_apk_nosign.yml` - 构建调试版本的APK，自动生成调试签名
-- `build_apk_with_debug_keystore.yml` - 专门用于构建带调试签名的APK
-- `auto_build_apk.yml` - 自动构建，如果配置了签名则构建发布版，否则构建调试版
+### 调试版本构建
+对于测试和开发，使用`build_apk_with_debug_keystore.yml`工作流，它会自动生成调试签名并构建APK。
 
-## 需要配置的密钥（Secrets）
+### 自动发布正式版本
+`build_release_apk.yml`工作流会在以下情况下自动触发：
+- 当代码推送到`master`或`main`分支时
+- 手动触发（可选）
 
-如果要构建带签名的发布版APK，需要在GitHub仓库的Settings > Secrets and variables > Actions中添加以下密钥：
+该工作流会：
+1. 自动生成正式签名密钥
+2. 使用该签名构建发布版APK
+3. 自动创建GitHub Release并上传APK文件
 
-1. `KEYSTORE_BASE64` - 使用base64编码的keystore文件
-2. `STORE_PASSWORD` - keystore的存储密码
-3. `KEY_PASSWORD` - 密钥密码
-4. `KEY_ALIAS` - 密钥别名
-
-## 如何生成密钥
-
-1. 生成keystore文件：
-   ```bash
-   keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -storepass your_store_password -keypass your_key_password -validity 10000 -alias your_key_alias
-   ```
-
-2. 将keystore文件转换为base64：
-   ```bash
-   base64 -i release-key.jks -o keystore-base64.txt
-   ```
-
-3. 将生成的base64字符串添加到GitHub Secrets中的`KEYSTORE_BASE64`字段
+### 手动生成签名密钥
+你也可以使用`generate_release_keystore.yml`生成签名密钥，然后下载并妥善保管该密钥文件，以便后续使用。
 
 ## 工作流触发方式
 
-1. `auto_build_apk.yml`:
-   - 推送到任何分支时自动触发
-   - 推送标签时会创建Release
-   - 可以手动触发
+1. `build_apk_with_debug_keystore.yml`:
+   - 可以手动触发（推荐用于日常开发和测试）
+   - 也可配置为在特定事件时自动触发
 
-2. `build_apk_nosign.yml`:
-   - 推送到任何分支时触发
+2. `build_release_apk.yml`:
+   - 当代码推送到`master`或`main`分支时自动触发
    - 可以手动触发
+   - 构建完成后自动发布到GitHub Release
 
-3. `build_apk_with_debug_keystore.yml`:
-   - 推送到任何分支时触发
-   - 可以手动触发
-
-4. `quick_apk_build.yml`:
-   - 推送到dev分支时触发
-   - 可以手动触发
-
-5. `signed_apk_build.yml`:
-   - 推送以"v"开头的标签时触发（如v1.0.0）
-   - 可以手动触发
+3. `generate_release_keystore.yml`:
+   - 手动触发，需要提供签名相关信息
+   - 用于生成并下载签名密钥文件
 
 ## 生成的APK文件
 
-构建完成后，APK文件将上传到GitHub Actions的Artifacts中，或者在Release中直接提供下载。
+对于调试版本，APK文件将上传到GitHub Actions的Artifacts中。
+对于正式版本，APK文件将自动发布到GitHub Release中。
+
+对于生产环境的正式发布，建议在本地环境使用固定的签名密钥进行构建，以确保应用更新时签名的一致性。
