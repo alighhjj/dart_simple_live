@@ -4,12 +4,16 @@
 
 1. `auto_build_apk.yml` - 自动构建APK并上传到Artifacts（如果配置了签名则构建发布版，否则构建调试版）
 2. `build_apk_nosign.yml` - 构建不带签名的调试版APK
-3. `quick_apk_build.yml` - 快速构建单一架构APK用于测试
-4. `signed_apk_build.yml` - 构建带签名的发布版APK并创建GitHub Release
+3. `build_apk_with_debug_keystore.yml` - 专门用于构建带调试签名的APK
+4. `quick_apk_build.yml` - 快速构建单一架构APK用于测试
+5. `signed_apk_build.yml` - 构建带签名的发布版APK并创建GitHub Release
 
 ## 不需要签名的构建
 
-对于测试和开发，可以直接使用`build_apk_nosign.yml`或`auto_build_apk.yml`工作流，它们会自动构建调试版本的APK，不需要任何签名配置。
+对于测试和开发，可以直接使用以下工作流之一：
+- `build_apk_nosign.yml` - 构建调试版本的APK，自动生成调试签名
+- `build_apk_with_debug_keystore.yml` - 专门用于构建带调试签名的APK
+- `auto_build_apk.yml` - 自动构建，如果配置了签名则构建发布版，否则构建调试版
 
 ## 需要配置的密钥（Secrets）
 
@@ -45,11 +49,15 @@
    - 推送到任何分支时触发
    - 可以手动触发
 
-3. `quick_apk_build.yml`:
+3. `build_apk_with_debug_keystore.yml`:
+   - 推送到任何分支时触发
+   - 可以手动触发
+
+4. `quick_apk_build.yml`:
    - 推送到dev分支时触发
    - 可以手动触发
 
-4. `signed_apk_build.yml`:
+5. `signed_apk_build.yml`:
    - 推送以"v"开头的标签时触发（如v1.0.0）
    - 可以手动触发
 

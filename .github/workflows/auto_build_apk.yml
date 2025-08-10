@@ -40,6 +40,12 @@ jobs:
           flutter-version: '3.22.x'
           cache: true
       
+      # 生成调试签名文件
+      - name: Generate debug keystore
+        run: |
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -noprompt
+      
       # 更新Flutter packages
       - name: Install dependencies
         run: |
@@ -54,7 +60,7 @@ jobs:
             echo "Building release APK with signing"
             flutter build apk --release --split-per-abi
           else
-            echo "Building debug APK without signing"
+            echo "Building debug APK with generated keystore"
             flutter build apk --debug --split-per-abi
           fi
       
