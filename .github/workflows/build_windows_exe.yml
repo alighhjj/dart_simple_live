@@ -1,0 +1,164 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+  pull_request:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: simple_live_app
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install NSIS
+        run: |
+          choco install nsis -y
+          echo "NSIS_PATH=C:\Program Files (x86)\NSIS" >> $env:GITHUB_ENV
+
+      - name: Get dependencies
+        run: |
+          flutter pub get
+
+      - name: Build Windows
+        run: |
+          flutter build windows --release
+
+      - name: Create NSIS Installer Script
+        run: |
+          # Create NSIS script
+          Set-Content -Path "installer.nsi" -Value @"
+          !define APP_NAME "Simple Live"
+          !define APP_VERSION "1.9.1"
+          !define APP_EXECUTABLE "simple_live_app.exe"
+          
+          # Include Modern UI
+          !include "MUI2.nsh"
+          
+          # General
+          Name "$${APP_NAME} $${APP_VERSION}"
+          OutFile "simple_live_installer.exe"
+          InstallDir "$PROGRAMFILES\Simple Live"
+          InstallDirRegKey HKCU "Software\Simple Live" ""
+          RequestExecutionLevel admin
+          
+          # Interface Settings
+          !define MUI_ABORTWARNING
+          
+          # Pages
+          !insertmacro MUI_PAGE_WELCOME
+          !insertmacro MUI_PAGE_DIRECTORY
+          !insertmacro MUI_PAGE_INSTFILES
+          !insertmacro MUI_PAGE_FINISH
+          
+          !insertmacro MUI_UNPAGE_CONFIRM
+          !insertmacro MUI_UNPAGE_INSTFILES
+          
+          # Languages
+          !insertmacro MUI_LANGUAGE "English"
+          !insertmacro MUI_LANGUAGE "SimpChinese"
+          
+          # Installer Sections
+          Section "Install"
+            # Set output path to the installation directory
+            SetOutPath $$INSTDIR
+            
+            # Add files
+            File /r "build\windows\x64\runner\Release\*"
+            
+            # Create uninstaller
+            WriteUninstaller "$$INSTDIR\Uninstall.exe"
+            
+            # Registry information for add/remove programs
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "DisplayName" "Simple Live"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "UninstallString" "$\"$$INSTDIR\Uninstall.exe$\""
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "QuietUninstallString" "$\"$$INSTDIR\Uninstall.exe$\" /S"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "InstallLocation" "$$INSTDIR"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "DisplayIcon" "$$INSTDIR\$${APP_EXECUTABLE},0"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "Publisher" "Simple Live Team"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "DisplayVersion" "$${APP_VERSION}"
+            WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "NoModify" 1
+            WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "NoRepair" 1
+            
+            # Create shortcut
+            CreateDirectory "$$SMPROGRAMS\Simple Live"
+            CreateShortCut "$$SMPROGRAMS\Simple Live\Simple Live.lnk" "$$INSTDIR\$${APP_EXECUTABLE}"
+            CreateShortCut "$$SMPROGRAMS\Simple Live\Uninstall.lnk" "$$INSTDIR\Uninstall.exe"
+            CreateShortCut "$$DESKTOP\Simple Live.lnk" "$$INSTDIR\$${APP_EXECUTABLE}"
+          SectionEnd
+          
+          # Uninstaller Section
+          Section "Uninstall"
+            # Remove files
+            RMDir /r "$$INSTDIR\*.*"
+            
+            # Remove directories
+            RMDir "$$INSTDIR"
+            
+            # Remove shortcuts
+            Delete "$$SMPROGRAMS\Simple Live\Simple Live.lnk"
+            Delete "$$SMPROGRAMS\Simple Live\Uninstall.lnk"
+            RMDir "$$SMPROGRAMS\Simple Live"
+            Delete "$$DESKTOP\Simple Live.lnk"
+            
+            # Remove registry keys
+            DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live"
+            DeleteRegKey HKCU "Software\Simple Live"
+          SectionEnd
+          "@
+
+      - name: Compile NSIS Installer
+        run: |
+          & "$env:NSIS_PATH\makensis.exe" installer.nsi
+
+      - name: Upload Windows Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-live-app-windows-installer
+          path: simple_live_app/simple_live_installer.exe
+          retention-days: 30
+
+      - name: Create Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: simple_live_installer.exe
+          tag_name: windows-${{ github.run_number }}
+          name: Windows Release ${{ github.run_number }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
