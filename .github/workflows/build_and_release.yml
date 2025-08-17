@@ -145,6 +145,10 @@ jobs:
     needs: [build-apk, build-windows]
     runs-on: ubuntu-latest
     steps:
+      # 检出代码以获取Git信息
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
       # 获取版本信息
       - name: Get version info
         id: version
