@@ -141,8 +141,62 @@ jobs:
           path: simple_live_app/build/windows/x64/runner/Release/simple_live_installer.exe
           retention-days: 1
 
+  build-macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: simple_live_app
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          cache: true
+      
+      - name: Get dependencies
+        run: |
+          flutter pub get
+      
+      - name: Build macOS
+        run: |
+          flutter build macos --release
+      
+      # 创建dmg安装包
+      - name: Create DMG
+        run: |
+          # 安装create-dmg工具
+          brew install create-dmg
+          
+          # 创建临时目录并复制应用
+          mkdir -p tmp
+          cp -R build/macos/Build/Products/Release/Simple\ Live.app tmp/
+          
+          # 创建DMG
+          create-dmg \
+            --volname "Simple Live" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "Simple Live.app" 200 190 \
+            --hide-extension "Simple Live.app" \
+            --app-drop-link 600 185 \
+            "simple_live_macos.dmg" \
+            "tmp/"
+      
+      # 上传macOS DMG作为artifact
+      - name: Upload macOS DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: simple_live_app/simple_live_macos.dmg
+          retention-days: 1
+
   create-release:
-    needs: [build-apk, build-windows]
+    needs: [build-apk, build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
       # 检出代码以获取Git信息
@@ -176,6 +230,13 @@ jobs:
           name: windows-installer
           path: windows-installer
       
+      # 下载macOS DMG artifact
+      - name: Download macOS DMG artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-installer
+          path: macos-installer
+      
       # 创建Release并上传所有文件
       - name: Create Release and Upload All Files
         uses: softprops/action-gh-release@v1
@@ -191,12 +252,13 @@ jobs:
             - Automated build from commit ${{ github.sha }}
             
             ## Assets
-            APK files for different architectures and Windows installer are attached.
+            APK files for different architectures, Windows installer, and macOS DMG are attached.
           files: |
             apk-files/app-armeabi-v7a-release.apk
             apk-files/app-arm64-v8a-release.apk
             apk-files/app-x86_64-release.apk
             windows-installer/simple_live_installer.exe
+            macos-installer/simple_live_macos.dmg
           draft: false
           prerelease: false
         env:
