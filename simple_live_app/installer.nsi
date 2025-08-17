@@ -41,8 +41,8 @@ Section "Install"
   
   # Registry information for add/remove programs
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "DisplayName" "Simple Live"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "UninstallString" "\"$INSTDIR\Uninstall.exe\""
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "QuietUninstallString" "\"$INSTDIR\Uninstall.exe\" /S"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "QuietUninstallString" "$\"$INSTDIR\Uninstall.exe$\" /S"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "DisplayIcon" "$INSTDIR\${APP_EXECUTABLE},0"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Simple Live" "Publisher" "Simple Live Team"
