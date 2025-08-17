@@ -34,7 +34,7 @@ Section "Install"
   SetOutPath $INSTDIR
   
   # Add files - corrected path
-  File /r "build\windows\x64\runner\Release\*"
+  File /r "*"
   
   # Create uninstaller
   WriteUninstaller "$INSTDIR\Uninstall.exe"

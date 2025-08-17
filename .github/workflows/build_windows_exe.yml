@@ -64,6 +64,7 @@ jobs:
 
       - name: Compile NSIS Installer
         run: |
+          Copy-Item "installer.nsi" -Destination "build/windows/x64/runner/Release/"
           cd build/windows/x64/runner/Release
           & "$env:NSIS_PATH\makensis.exe" installer.nsi
 
@@ -75,7 +76,7 @@ jobs:
           retention-days: 30
 
       - name: Create Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v1
         with:
           files: build/windows/x64/runner/Release/simple_live_installer.exe
