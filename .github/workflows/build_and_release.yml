@@ -1,0 +1,199 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      # 签出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # 设置Java环境
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+      
+      # 设置Flutter环境
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          cache: true
+      
+      # 生成签名文件
+      - name: Generate release keystore
+        run: |
+          mkdir -p ~/.android
+          keytool -genkey -v \
+            -keystore ~/.android/release.jks \
+            -storepass release123 \
+            -alias release \
+            -keypass release123 \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=SimpleLive, OU=Development, O=SimpleLive, L=City, ST=State, C=CN" \
+            -noprompt
+      
+      # 创建key.properties文件
+      - name: Create key.properties
+        run: |
+          echo "storeFile=/home/runner/.android/release.jks" > simple_live_app/android/key.properties
+          echo "storePassword=release123" >> simple_live_app/android/key.properties
+          echo "keyPassword=release123" >> simple_live_app/android/key.properties
+          echo "keyAlias=release" >> simple_live_app/android/key.properties
+      
+      # 更新Flutter packages
+      - name: Install dependencies
+        run: |
+          cd simple_live_app
+          flutter pub get
+      
+      # 构建发布版APK
+      - name: Build Release APK
+        run: |
+          cd simple_live_app
+          flutter build apk --release --split-per-abi
+      
+      # 上传APK作为artifact
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-files
+          path: |
+            simple_live_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            simple_live_app/build/app/outputs/flutter-apk/app-x86_64-release.apk
+          retention-days: 1
+
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: simple_live_app
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install NSIS
+        run: |
+          choco install nsis -y
+          echo "NSIS_PATH=C:\Program Files (x86)\NSIS" >> $env:GITHUB_ENV
+
+      - name: Get dependencies
+        run: |
+          flutter pub get
+
+      - name: Build Windows
+        run: |
+          flutter build windows --release
+
+      - name: Create NSIS Installer Script
+        run: |
+          # Copy pre-created NSIS script
+          Copy-Item "installer.nsi" -Destination "build/windows/x64/runner/Release/installer.nsi"
+
+      - name: Compile NSIS Installer
+        run: |
+          Copy-Item "installer.nsi" -Destination "build/windows/x64/runner/Release/"
+          cd build/windows/x64/runner/Release
+          & "$env:NSIS_PATH\makensis.exe" installer.nsi
+
+      # 上传Windows EXE作为artifact
+      - name: Upload Windows EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: simple_live_app/build/windows/x64/runner/Release/simple_live_installer.exe
+          retention-days: 1
+
+  create-release:
+    needs: [build-apk, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      # 获取版本信息
+      - name: Get version info
+        id: version
+        run: |
+          # 尝试从输入获取版本，否则使用提交哈希
+          if [ "${{ github.event.inputs.version }}" != "" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="v$(date +'%Y%m%d')-$(git rev-parse --short HEAD)"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+      
+      # 下载APK artifacts
+      - name: Download APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: apk-files
+          path: apk-files
+      
+      # 下载Windows EXE artifact
+      - name: Download Windows EXE artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: windows-installer
+      
+      # 创建Release并上传所有文件
+      - name: Create Release and Upload All Files
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Release ${{ env.VERSION }}
+          body: |
+            # Simple Live Release ${{ env.VERSION }}
+            
+            This release was automatically generated by GitHub Actions.
+            
+            ## Changes
+            - Automated build from commit ${{ github.sha }}
+            
+            ## Assets
+            APK files for different architectures and Windows installer are attached.
+          files: |
+            apk-files/app-armeabi-v7a-release.apk
+            apk-files/app-arm64-v8a-release.apk
+            apk-files/app-x86_64-release.apk
+            windows-installer/simple_live_installer.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
